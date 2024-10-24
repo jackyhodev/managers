@@ -11,7 +11,7 @@ on:
       jacocoEnabled:
         description: 'Enable Jacoco code coverage (set to "false" for release builds)'
         required: true
-        default: 'true'
+        default: 'false'
         type: choice
         options:
         - 'true'
@@ -29,7 +29,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  NAMESPACE: galasa-dev
+  NAMESPACE: jackyhodev
   BRANCH: ${{ github.ref_name }}
 
 jobs:
@@ -69,7 +69,7 @@ jobs:
         if: github.event_name == 'push'
         env:
           GITHUB_ACTOR: ${{ github.actor }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
           ORG_GRADLE_PROJECT_signingKeyId:  ${{ secrets.GPG_KEYID }}
           ORG_GRADLE_PROJECT_signingKey: ${{ secrets.GPG_KEY }}
           ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.GPG_PASSPHRASE }}
@@ -77,6 +77,7 @@ jobs:
           set -o pipefail
           gradle -b galasa-managers-parent/build.gradle check publish --info \
           --no-daemon --console plain \
+          -Dgpg.skip=true \
           -Dorg.gradle.jvmargs=-Xmx4096M \
           -PsourceMaven=https://development.galasa.dev/${{ env.BRANCH }}/maven-repo/extensions \
           -PcentralMaven=https://repo.maven.apache.org/maven2/ \
@@ -88,7 +89,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch' # Use the input values provided by the workflow dispatch.
         env:
           GITHUB_ACTOR: ${{ github.actor }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
           ORG_GRADLE_PROJECT_signingKeyId:  ${{ secrets.GPG_KEYID }}
           ORG_GRADLE_PROJECT_signingKey: ${{ secrets.GPG_KEY }}
           ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.GPG_PASSPHRASE }}
@@ -96,6 +97,7 @@ jobs:
           set -o pipefail
           gradle -b galasa-managers-parent/build.gradle check publish --info \
           --no-daemon --console plain \
+          -Dgpg.skip=true \
           -Dorg.gradle.jvmargs=-Xmx4096M \
           -PsourceMaven=https://development.galasa.dev/${{ env.BRANCH }}/maven-repo/extensions \
           -PcentralMaven=https://repo.maven.apache.org/maven2/ \
@@ -124,8 +126,8 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
-          username: galasa-team
-          password: ${{ secrets.GALASA_TEAM_WRITE_PACKAGES_TOKEN }}
+          username: jackyhodev
+          password: ${{ secrets.GH_TOKEN }}
   
       - name: Extract metadata for Managers image
         id: metadata
@@ -146,17 +148,17 @@ jobs:
             dockerRepository=ghcr.io
             tag=${{ env.BRANCH }}
 
-      - name: Recycle application in ArgoCD
-        env: 
-          ARGOCD_AUTH_TOKEN: ${{ secrets.ARGOCD_TOKEN }}
-        run: |
-          docker run --env ARGOCD_AUTH_TOKEN=${{ env.ARGOCD_AUTH_TOKEN }} --rm -v ${{ github.workspace }}:/var/workspace ghcr.io/galasa-dev/argocdcli:main app actions run ${{ env.BRANCH }}-maven-repos restart --kind Deployment --resource-name managers-${{ env.BRANCH }} --server argocd.galasa.dev
+      #- name: Recycle application in ArgoCD
+        #env: 
+          #ARGOCD_AUTH_TOKEN: ${{ secrets.ARGOCD_TOKEN }}
+        #run: |
+          #docker run --env ARGOCD_AUTH_TOKEN=${{ env.ARGOCD_AUTH_TOKEN }} --rm -v ${{ github.workspace }}:/var/workspace ghcr.io/galasa-dev/argocdcli:main app actions run ${{ env.BRANCH }}-maven-repos restart --kind Deployment --resource-name managers-${{ env.BRANCH }} --server argocd.galasa.dev
 
-      - name: Wait for app health in ArgoCD
-        env: 
-          ARGOCD_AUTH_TOKEN: ${{ secrets.ARGOCD_TOKEN }}
-        run: |
-          docker run --env ARGOCD_AUTH_TOKEN=${{ env.ARGOCD_AUTH_TOKEN }} --rm -v ${{ github.workspace }}:/var/workspace ghcr.io/galasa-dev/argocdcli:main app wait ${{ env.BRANCH }}-maven-repos --resource apps:Deployment:managers-${{ env.BRANCH }} --health --server argocd.galasa.dev
+      #- name: Wait for app health in ArgoCD
+        #env: 
+          #ARGOCD_AUTH_TOKEN: ${{ secrets.ARGOCD_TOKEN }}
+        #run: |
+          #docker run --env ARGOCD_AUTH_TOKEN=${{ env.ARGOCD_AUTH_TOKEN }} --rm -v ${{ github.workspace }}:/var/workspace ghcr.io/galasa-dev/argocdcli:main app wait ${{ env.BRANCH }}-maven-repos --resource apps:Deployment:managers-${{ env.BRANCH }} --health --server argocd.galasa.dev
 
   trigger-obr-workflow:
     name: Trigger OBR workflow
@@ -166,9 +168,9 @@ jobs:
     steps:
       - name: Trigger OBR workflow dispatch event with GitHub CLI
         env:
-          GH_TOKEN: ${{ secrets.GALASA_TEAM_GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
-          gh workflow run build.yaml --repo https://github.com/galasa-dev/obr --ref ${{ env.BRANCH }}
+          gh workflow run build.yaml --repo https://github.com/jackyhodev/obr --ref ${{ env.BRANCH }}
 
   report-failure:
     name: Report failure in workflow
